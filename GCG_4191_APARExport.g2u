@@ -1,0 +1,1001 @@
+Program.Sub.Preflight.Start
+
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.SetErrorHandler("Main_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+v.local.sSubsql.Declare(String)
+V.Local.sInvAmt.Declare(String)
+
+'F.Intrinsic.Debug.InvokeDebugger
+'
+'F.Intrinsic.Debug.Stop
+'V.Local.sInvAmt.Set("100")
+'
+'Function.Intrinsic.String.Format(V.Local.sInvAmt,"####.00", V.Local.sInvAmt)
+'f.Intrinsic.UI.Msgbox(V.Local.sInvAmt)
+'F.Intrinsic.Control.End
+
+'open connection
+F.odbc.Connection!con.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass,72000)
+
+f.Intrinsic.Control.If(v.Caller.Hook, =, 42400)
+	f.Intrinsic.Control.CallSub(createfile)
+f.Intrinsic.Control.EndIf 
+
+'close connection to the database
+F.ODBC.Connection!con.Close
+
+'end the program
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Main_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4191_APARExport.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+Function.Intrinsic.Control.EndIf
+
+
+Program.Sub.Main.End
+
+Program.Sub.CreateFile.Start
+F.Intrinsic.Control.SetErrorHandler("CreateFile_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+V.Local.sSQL.Declare(String)
+V.Local.sBatchno.Declare(String)
+V.Local.sBatchType.Declare(String)
+
+
+'V.Local.sBatchno.Set("45648")
+
+'loop through all the Batch Codes
+F.Intrinsic.String.Build("select distinct Batch_num,APPL_TYPE,Batch_Type from v_BI_COMB_JE_AUDIT where Batch_Type <> '' and Rptid = '000817' and trmnl = '{0}'",V.Caller.Terminal,V.Local.sSQL)
+'For testing. using TRT Database
+'f.Intrinsic.String.Build("select distinct Batch_num,APPL_TYPE from v_BI_COMB_JE_AUDIT where  Rptid = '000817' and trmnl = '{0}'","165",V.Local.sSQL)
+
+
+'F.Intrinsic.Debug.InvokeDebugger
+'
+'F.Intrinsic.Debug.Stop
+
+F.ODBC.Connection!con.OpenRecordsetRO("rstB",V.local.ssql)
+'check to see if eof is false
+f.Intrinsic.Control.DoUntil(V.ODBC.con!rstB.EOF,=,True)
+	v.Local.sBatchType.Set(v.ODBC.con!rstB.FieldValTrim!Batch_Type)
+	F.Intrinsic.Control.If(v.Local.sBatchType.UCase,=,"AP ACCRUALS")
+		F.Intrinsic.Control.CallSub(ExportGL, "Batch", V.ODBC.con!rstB.FieldVal!Batch_num,"BatchType", v.Local.sBatchType.UCase)
+	F.Intrinsic.Control.ElseIf(v.ODBC.con!rstB.FieldVal!APPL_TYPE,=,"AR")
+		f.Intrinsic.Control.CallSub(AR_Export2,"Batch",v.ODBC.con!rstB.FieldVal!Batch_num,"BatchType", v.Local.sBatchType.UCase)
+	F.Intrinsic.Control.elseIf(v.ODBC.con!rstB.FieldVal!APPL_TYPE,=,"AP")
+		f.Intrinsic.Control.CallSub(ExportAP,"Batch",v.ODBC.con!rstB.FieldVal!Batch_num,"BatchType", v.Local.sBatchType.UCase)
+'		f.Intrinsic.Control.CallSub(ExportAP,"Batch","P0115","BatchType", v.Local.sBatchType.UCase)
+'		f.Intrinsic.Control.CallSub(ExportAP,"Batch","P0101","BatchType", v.Local.sBatchType.UCase)
+	Function.Intrinsic.Control.ElseIf(v.ODBC.con!rstB.FieldVal!APPL_TYPE,=,"GL")
+		F.Intrinsic.Control.CallSub(ExportGL, "Batch", V.ODBC.con!rstB.FieldVal!Batch_num,"BatchType", "")
+	Function.Intrinsic.Control.ElseIf(v.ODBC.con!rstB.FieldVal!APPL_TYPE,=,"IV")
+		F.Intrinsic.Control.CallSub(ExportInventory, "Batch", V.ODBC.con!rstB.FieldVal!Batch_num)
+	F.Intrinsic.Control.endIf
+	'9/21/16 Dawn: Added a sleeper so files are not over written
+	F.Intrinsic.UI.Sleep(2)
+	f.ODBC.con!rstB.MoveNext 
+F.Intrinsic.Control.Loop 
+f.ODBC.con!rstB.Close
+
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("CreateFile_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4191_APARExport.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+Function.Intrinsic.Control.EndIf
+
+
+Program.Sub.CreateFile.End
+
+Program.Sub.ExportAP.Start
+F.Intrinsic.Control.SetErrorHandler("ExportAP_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+
+
+V.Local.sSQL.Declare(String)
+V.Local.sExportHdr.Declare(String)
+V.Local.sExportDet.Declare(String)
+V.Local.sBatchno.Declare(String)
+V.Local.bexists.Declare(Boolean)
+V.Local.sdate.Declare(String)
+V.Local.sfilename.Declare(String)
+V.Local.sfile.Declare(String)
+V.Local.sfullpath.Declare(String)
+V.Local.sdate1.Declare(String)
+V.Local.sInvoiceNo.Declare(String)
+V.Local.sPaymentT.Declare(String)
+
+V.Local.sVendor.Declare(String)
+V.Local.sDocNo.Declare(String)
+V.Local.sPurAmt.Declare(String)
+V.Local.sInvNo.Declare(String)
+V.Local.sDocDate.Declare(String)
+V.Local.sDocDate1.Declare(String)
+V.Local.sFrtAMT.Declare(String)
+V.Local.sMiscAMT.Declare(String)
+V.Local.sCurrAMT.Declare(String)
+V.Local.sExchgCurr.Declare(String)
+V.Local.sExchgRate.Declare(String)
+V.Local.sGLAcctNo.Declare(String)
+V.Local.sFacility.Declare(String)
+V.Local.sPayType.Declare(String)
+V.Local.sDocType.Declare(String)
+v.local.bret.Declare(Boolean)
+v.local.sret.Declare(String)
+v.local.sSubsql.Declare(String)
+v.local.fAmtTrans.Declare(String)
+V.Local.dInvcDate.Declare(Date)
+
+'F.Intrinsic.Debug.InvokeDebugger
+'
+'F.Intrinsic.Debug.Stop
+
+	V.Local.sBatchno.Set(v.Args.Batch)
+'	V.Local.sBatchno.Set("P0100")
+
+'9/22/16 Dawn: Changed the sql to pull from view do date formatting is correct
+'9/21/16 Dawn: Removed repeating select items from query
+V.Local.sSQL.Set("select vendor,AMT_Invoice,batch_code,purchase_order,invoice,Date_Invoice,Exchange_Curr,GL_Account,freight,Exchange_Amt from V_AP_Open_Items ")
+'AP Invoice/Accruals
+	f.Intrinsic.Control.If(v.Args.BatchType,=,"AP INVOICE/ACCRUALS")	
+		v.local.sSubsql.Set("batch_code <> '09' and ")
+	f.Intrinsic.Control.EndIf 
+'	
+'	f.Intrinsic.String.Build(" {0} where {1} Batch_NUM = '{2}'",V.Local.sSQL,v.local.sSubsql,V.Local.sBatchno,V.Local.sSQL)
+	f.Intrinsic.String.Build(" {0} where {1} Batch_NUM = '{2}' and amt_Transaction > 0",V.Local.sSQL,v.local.sSubsql,V.Local.sBatchno,V.Local.sSQL)
+	F.ODBC.Connection!con.OpenRecordsetRO("rst",V.local.ssql)
+	F.Intrinsic.Control.If(V.ODBC.con!rst.EOF,=,False)
+
+		Function.Intrinsic.String.Format(v.ODBC.con!rst.FieldVal!Date_Invoice ,"MM/DD/YYYY",V.Local.sDocDate)
+		f.Intrinsic.Control.DoUntil(v.ODBC.con!rst.EOF,=,true)
+
+
+			'select sum(amt_Transaction) from V_AP_Open_Items where batch_num = 'P0100' and amt_Transaction > 0
+'			f.Intrinsic.String.Build("select sum(amt_Transaction) as amt_Transaction  from V_AP_Open_Items where batch_num = '{0}' and amt_Transaction > 0 and invoice ='{1}'",v.Args.Batch,v.ODBC.con!rst.FieldValtrim!invoice,V.local.ssql)
+			f.Intrinsic.String.Build("select sum(amount_cmpny) as amt_Transaction  from GL_AP_DETAIL where batch = '{0}' and amount_cmpny > 0 and invoice_no = '{1}'",v.Args.Batch,v.ODBC.con!rst.FieldValtrim!invoice,V.local.ssql)
+			F.ODBC.Connection!con.OpenRecordsetRO("rst1",V.local.ssql)
+			F.Intrinsic.Control.If(V.ODBC.con!rst1.EOF,=,False)
+				v.local.fAmtTrans.Set(v.ODBC.con!rst1.FieldVal!amt_Transaction)
+			f.Intrinsic.Control.EndIf 
+			f.ODBC.con!rst1.Close
+
+'			f.Intrinsic.Debug.setLA(v.Local.ssql)
+
+				'process only Invoices are different
+'			f.Intrinsic.Control.If(V.Local.sInvoiceNo,<>,v.ODBC.con!rst.FieldValtrim!invoice)
+				V.Local.sInvoiceNo.Set(v.ODBC.con!rst.FieldValtrim!invoice)
+				Function.Intrinsic.String.Format(v.ODBC.con!rst.FieldVal!Date_Invoice,"MM/DD/YYYY",V.Local.sdate)
+
+				'calculate total 
+'				f.Intrinsic.String.Build("select sum(AMT_Invoice) as AMTINVOICE,sum(freight) as FRT,sum(Exchange_Amt) as ExChgAmt from AP_Open_Items where batch_num = '{0}' and invoice = '{1}'",V.Local.sBatchno,v.ODBC.con!rst.FieldValtrim!invoice,V.Local.sSQL)
+'				F.ODBC.Connection!con.OpenRecordsetRO("rst1",V.local.ssql)
+
+'				f.Intrinsic.Control.If(v.ODBC.con!rst.FieldVal!batch_code,=,"10")
+'					V.Local.sDocType.Set("1")
+'				f.Intrinsic.Control.ElseIf(v.ODBC.con!rst.FieldVal!batch_code,=,"09")
+'					V.Local.sDocType.Set("2")
+'				f.Intrinsic.Control.EndIf 
+
+				'Accrual 12
+				f.Intrinsic.Control.If(v.ODBC.con!rst.FieldVal!batch_code,=,"12")
+					V.Local.sDocType.Set("2")
+				f.Intrinsic.Control.Else
+					V.Local.sDocType.Set("1")
+				f.Intrinsic.Control.EndIf 
+
+
+				f.Intrinsic.String.Build("select CURRENCY from vendor_curr where vendor = '{0}'",v.ODBC.con!rst.FieldValtrim!vendor,V.Local.sSQL)
+				F.ODBC.Connection!con.OpenRecordsetRO("rstFRT",V.local.ssql)
+				F.Intrinsic.Control.If(V.ODBC.con!rstFRT.EOF,=,False)
+					f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rstFRT.FieldValTrim!CURRENCY,V.Local.sExchgCurr) 
+				f.Intrinsic.Control.EndIf 
+				f.ODBC.con!rstFRT.Close
+
+
+				f.Intrinsic.String.Build("select Terms_message from v_ap_terms join V_VENDOR_PAY_TO on terms_code = Payment_Terms where vendor = '{0}'",v.ODBC.con!rst.FieldValtrim!vendor,V.Local.sSQL)
+				F.ODBC.Connection!con.OpenRecordsetRO("rst2",V.local.ssql)
+				F.Intrinsic.Control.If(V.ODBC.con!rst2.EOF,=,False)
+					V.Local.sPaymentT.Set(v.ODBC.con!rst2.FieldVal!Terms_message)
+					f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst2.FieldValtrim!Terms_message,V.Local.sPaymentT)
+				f.Intrinsic.Control.EndIf 
+				f.ODBC.con!rst2.Close
+
+
+				f.Intrinsic.String.Build("select External_id from v_VENDOR_ADDL where vendor = '{0}'",v.ODBC.con!rst.FieldValtrim!vendor,V.Local.sSQL)
+				F.ODBC.Connection!con.OpenRecordsetRO("rst3",V.local.ssql)
+				F.Intrinsic.Control.If(V.ODBC.con!rst3.EOF,=,False)
+					f.Intrinsic.String.Build("{0}VSA{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst3.FieldValtrim!External_id,V.Local.sVendor)
+				f.Intrinsic.Control.EndIf 
+				f.ODBC.con!rst3.Close
+
+'				f.Intrinsic.Control.If(v.ODBC.con!rst.FieldVal!AMT_Invoice,<>,0)
+'					Function.Intrinsic.String.Format(v.ODBC.con!rst.FieldVal!AMT_Invoice,"####.00", V.Local.sPurAmt)
+'				f.Intrinsic.Control.Else 
+'					V.Local.sPurAmt.Set(v.ODBC.con!rst.FieldVal!AMT_Invoice)
+'				f.Intrinsic.Control.EndIf
+'				V.Local.sCurrAMT.Set(V.Local.sPurAmt)
+
+
+
+				f.Intrinsic.Control.If(v.Local.fAmtTrans,<>,0)
+					Function.Intrinsic.String.Format(v.Local.fAmtTrans,"####.00", V.Local.sPurAmt)
+				f.Intrinsic.Control.Else 
+					V.Local.sPurAmt.Set(v.Local.fAmtTrans)
+				f.Intrinsic.Control.EndIf
+				V.Local.sCurrAMT.Set(V.Local.sPurAmt)
+
+				'Hdr
+'				f.Intrinsic.String.Build("{0}VSA{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst.FieldValtrim!vendor,V.Local.sVendor)
+				f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,V.Local.sPurAmt,V.Local.sPurAmt)
+				f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst.FieldValtrim!purchase_order,V.Local.sDocNo)
+				f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst.FieldValtrim!invoice,V.Local.sInvNo)
+'				f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst.FieldValTrim!freight,V.Local.sFrtAMT)
+				f.Intrinsic.String.Build("{0}0{0}",v.Ambient.DblQuote,V.Local.sMiscAMT)
+				f.Intrinsic.String.Build("{0}1{0}",v.Ambient.DblQuote,V.Local.sExchgRate)
+'				f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst.FieldValTrim!Exchange_Amt,V.Local.sCurrAMT)
+				f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,V.Local.sCurrAMT,V.Local.sCurrAMT)
+'				f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst.FieldValTrim!Exchange_Curr,V.Local.sExchgCurr)
+				f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,V.Local.sdate,V.Local.sdate1)
+				f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,V.Local.sDocDate,V.Local.sDocDate1)
+				f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,"SUMMIT",V.Local.sFacility)
+
+'				v.local.bret.set(False)
+'				f.Intrinsic.String.Build("select upper(descr) as descr from GL_Master where GL_Account = '{0}'",v.ODBC.con!rst.FieldVal!GL_Account,V.Local.sSQL)
+'				F.ODBC.Connection!con.OpenRecordsetRO("rstFRT",V.local.ssql)
+'				F.Intrinsic.Control.If(V.ODBC.con!rstFRT.EOF,=,False)
+'					Function.Intrinsic.String.IsInString(v.ODBC.con!rstFRT.FieldValTrim!descr,"FREIGHT",True,v.local.bret)
+'				f.Intrinsic.Control.EndIf 
+'				f.ODBC.con!rstFRT.Close
+
+'				Function.Intrinsic.String.IsInString(v.ODBC.con!rstFRT.FieldValTrim!descr,"FREIGHT",True,v.local.bret)
+
+				Function.Intrinsic.String.Right(v.ODBC.con!rst.FieldValtrim!invoice,1,v.local.sret)
+'				
+				'if Freight Account
+				f.Intrinsic.Control.If(v.local.sret.UCase,=,"F")
+'					V.Local.sFrtAMT.Set(v.ODBC.con!rst.FieldVal!AMT_Invoice)
+					V.Local.sFrtAMT.Set(v.Local.fAmtTrans)
+				f.Intrinsic.Control.Else
+'					f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst.FieldValTrim!freight,V.Local.sFrtAMT)
+					V.Local.sFrtAMT.Set(v.ODBC.con!rst.FieldVal!freight)
+				f.Intrinsic.Control.EndIf 
+
+
+'				f.Intrinsic.Control.If(v.ODBC.con!rst.FieldVal!AMT_Invoice,<>,0)
+'					Function.Intrinsic.String.Format(v.ODBC.con!rst.FieldVal!AMT_Invoice,"####.00", V.Local.sFrtAMT)
+'				f.Intrinsic.Control.Else
+'					V.Local.sFrtAMT.Set(v.ODBC.con!rst.FieldVal!AMT_Invoice)
+'				f.Intrinsic.Control.EndIf 
+
+				f.Intrinsic.Control.If(v.Local.fAmtTrans,<>,0)
+					Function.Intrinsic.String.Format(v.Local.fAmtTrans,"####.00", V.Local.sFrtAMT)
+				f.Intrinsic.Control.Else
+					V.Local.sFrtAMT.Set(v.Local.fAmtTrans)
+				f.Intrinsic.Control.EndIf 
+
+				f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,V.Local.sFrtAMT,V.Local.sFrtAMT)
+
+				'Remove 1st char
+				f.Intrinsic.String.Mid(v.Args.Batch,2,V.Local.sBatchno)
+
+				'v.ODBC.con!rst.FieldVal!Terms_Code
+				f.Intrinsic.String.Build("{0}{1},{2},{3},{4},{5},{6},{7},",V.Local.sExportHdr,V.Local.sVendor,V.Local.sPurAmt,V.Local.sBatchno,V.Local.sDocType,V.Local.sDocNo,V.Local.sInvNo,V.Local.sInvNo,V.Local.sExportHdr)
+				f.Intrinsic.String.Build("{0}{1},{2},{3},{3},{3},{3},",V.Local.sExportHdr,V.Local.sDocDate1,V.Local.sFrtAMT,V.Local.sMiscAMT,V.Local.sExportHdr)
+
+				f.Intrinsic.String.Build("{0}{1},{2},{3},{4},",V.Local.sExportHdr,V.Local.sPaymentT,V.Local.sdate1,V.Local.sFacility,V.Local.sInvNo,V.Local.sExportHdr)
+
+				'9/23/16 Dawn: Trimed variables
+				f.Intrinsic.String.Build("{0}{1},{2},{3}{4}",V.Local.sExportHdr,V.Local.sExchgCurr,V.Local.sCurrAMT,V.Local.sExchgRate,v.Ambient.NewLine ,v.Local.sExportHdr)
+
+
+
+				'Detail file 9/23/16 Dawn: Trimed variables
+'				f.Intrinsic.String.Build("{0}{1},{2},{3},{4},{5},{6},{7},{8}{9}",V.Local.sExportDet,v.ODBC.con!rst.FieldValTrim!GL_Account,v.ODBC.con!rst.FieldValTrim!batch_code,v.ODBC.con!rst1.FieldValTrim!AMTINVOICE,v.ODBC.con!rst.FieldValtrim!purchase_order,V.Local.sdate,V.Local.sBatchno,v.Caller.CompanyCode,v.ODBC.con!rst.FieldValtrim!invoice,v.Ambient.NewLine,V.Local.sExportDet)
+'				f.Intrinsic.String.Build("{0}{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11}{12}",V.Local.sExportDet,V.Local.sGLAcctNo,V.Local.sDocType,V.Local.sPurAmt,V.Local.sDocNo,V.Local.sVendor,V.Local.sInvNo,V.Local.sDocNo,V.Local.sdate,V.Local.sBatchno,V.Local.sFacility,V.Local.sInvNo,v.Ambient.NewLine,V.Local.sExportDet)
+'				f.ODBC.con!rst1.Close
+'			f.Intrinsic.Control.EndIf 
+
+			f.ODBC.con!rst.MoveNext 
+		f.Intrinsic.Control.loop
+		f.ODBC.con!rst.Close
+
+
+
+		V.Local.sSQL.Set("select Vendor,GL_Number as GL_ACCOUNT,Amount_CMPNY AS AMOUNT,invoice_no,Invc_Date,PO_Num as PO_NUMBER,Tran_Type from V_GL_AP_DETAIL ")
+		f.Intrinsic.String.Build(" {0} where Batch = '{1}'",V.Local.sSQL,v.Args.Batch,V.Local.sSQL)
+
+'		V.Local.sSQL.Set("select Vendor,GL_Account,invoice_no,Invc_Date,PO_Number,abs(amount) as asb,sum(amount) as Amount from v_gl_detail ") 
+'		f.Intrinsic.String.Build(" {0} where batch_num = '{1}' group by Vendor,GL_Account,invoice_no,Invc_Date,PO_Number,abs(amount) having sum(amount)<>0",V.Local.sSQL,v.Args.Batch,V.Local.sSQL)
+
+		F.ODBC.Connection!con.OpenRecordsetRO("rst",V.local.ssql)
+		F.Intrinsic.Control.If(V.ODBC.con!rst.EOF,=,False)
+				f.Intrinsic.Control.DoUntil(v.ODBC.con!rst.EOF,=,true)
+
+				'Details
+
+'if amt is negative then 6
+'if amt is positive... then 65
+
+'F.Intrinsic.Debug.InvokeDebugger
+'
+'F.Intrinsic.Debug.Stop
+
+			'credit memo
+				f.Intrinsic.Control.If(v.Args.BatchType,=,"AP DEBITS")
+					f.Intrinsic.Control.If(v.ODBC.con!rst.FieldVal!Amount,>=,0)
+						V.Local.sDocType.Set("6")
+					f.Intrinsic.Control.Else
+						V.Local.sDocType.Set("65")
+					f.Intrinsic.Control.EndIf
+				f.Intrinsic.Control.Else
+					f.Intrinsic.Control.If(v.ODBC.con!rst.FieldVal!Amount,>=,0)
+						V.Local.sDocType.Set("65")
+					f.Intrinsic.Control.Else
+						V.Local.sDocType.Set("6")
+					f.Intrinsic.Control.EndIf
+				f.Intrinsic.Control.EndIf 
+
+
+				f.Intrinsic.String.Build("select External_id from v_VENDOR_ADDL where vendor = '{0}'",v.ODBC.con!rst.FieldValtrim!vendor,V.Local.sSQL)
+				F.ODBC.Connection!con.OpenRecordsetRO("rst3",V.local.ssql)
+				F.Intrinsic.Control.If(V.ODBC.con!rst3.EOF,=,False)
+					f.Intrinsic.String.Build("{0}VSA{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst3.FieldValtrim!External_id,V.Local.sVendor)
+				f.Intrinsic.Control.EndIf 
+				f.ODBC.con!rst3.Close
+
+				f.Intrinsic.Control.If(v.ODBC.con!rst.FieldVal!Amount,<>,0)
+					Function.Intrinsic.String.Format(v.ODBC.con!rst.FieldVal!Amount,"####.00", V.Local.sPurAmt)
+				f.Intrinsic.Control.Else
+					V.Local.sPurAmt.Set(v.ODBC.con!rst.FieldVal!Amount)
+				f.Intrinsic.Control.EndIf 
+
+				f.Intrinsic.String.Build("{0}{1}0000{0}",v.Ambient.DblQuote,v.ODBC.con!rst.FieldValTrim!GL_Account,V.Local.sGLAcctNo)
+				f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,V.Local.sPurAmt,V.Local.sPurAmt)
+				f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst.FieldValtrim!invoice_no,V.Local.sInvNo)
+
+'				f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst.FieldValTrim!Vendor,V.Local.sVendor)
+				f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst.FieldValTrim!PO_Number,V.Local.sDocNo)
+				F.Intrinsic.Date.ConvertDString(v.ODBC.con!rst.FieldVal!Invc_Date,"YYYYMMDD",V.Local.dInvcDate)
+				Function.Intrinsic.String.Format(V.Local.dInvcDate,"MM/DD/YYYY",V.Local.sdate)
+				f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,V.Local.sdate,V.Local.sdate)
+
+'				f.Intrinsic.Control.If(v.ODBC.con!rst.FieldVal!Tran_Type,=,"10")
+'					V.Local.sDocType.Set("1")
+'				f.Intrinsic.Control.ElseIf(v.ODBC.con!rst.FieldVal!Tran_Type,=,"09")
+'					V.Local.sDocType.Set("2")
+'				f.Intrinsic.Control.EndIf 
+
+				'Detail file
+
+'				f.Intrinsic.String.Build("{0}{1},{2},{3},{4},{5},{6},{7}{8}",V.Local.sExportDet,V.Local.sGLAcctNo,v.ODBC.con!rst.FieldValtrim!Tran_Type,V.Local.sPurAmt,V.Local.sInvNo,V.Local.sDocText,V.Local.sBatchno,V.Local.sFacility,v.Ambient.NewLine,V.Local.sExportDet)
+				f.Intrinsic.String.Build("{0}{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11}{12}",V.Local.sExportDet,V.Local.sGLAcctNo,V.Local.sDocType,V.Local.sPurAmt,V.Local.sDocNo,V.Local.sVendor,V.Local.sInvNo,V.Local.sDocNo,V.Local.sdate,V.Local.sBatchno,V.Local.sFacility,V.Local.sInvNo,v.Ambient.NewLine,V.Local.sExportDet)
+
+				f.ODBC.con!rst.MoveNext 
+			f.Intrinsic.Control.loop
+		f.Intrinsic.Control.EndIf 
+
+
+		'build the filepath
+	F.Intrinsic.String.build("{0}{1}",V.Caller.FilesDir,"\Great Plains\AP",V.Local.sfile)
+	'see if the folder exists
+	F.Intrinsic.File.Exists(V.Local.sfile,V.Local.bexists)
+	'if the file doesn't exists create it
+	F.Intrinsic.Control.If(V.Local.bexists,=,False)
+		F.Intrinsic.File.CreateDir(V.Local.sfile)
+	F.Intrinsic.Control.EndIf
+	'set the date and format it
+
+	Function.Intrinsic.String.Format (V.Ambient.Date,"YYYYDDMM",V.Local.sdate)
+	Function.Intrinsic.String.Format (V.Ambient.Time,"HHNNSS",V.Local.sdate1)
+	f.Intrinsic.String.Build("{0} {1}",V.Local.sdate,V.Local.sdate1,V.Local.sdate)
+	'build the filename
+	F.Intrinsic.String.Build("{0}_AP.csv",V.Local.sDate,V.Local.sfilename)
+	'build the full path
+	F.Intrinsic.String.Build("{0}\{1}",V.local.sfile,V.Local.sfilename,V.Local.sfullpath)
+	F.Intrinsic.File.String2File(V.Local.sfullpath,V.Local.sExportHdr)
+
+	F.Intrinsic.String.Build("{0}_APDETAIL.csv",V.Local.sDate,V.Local.sfilename)
+	F.Intrinsic.String.Build("{0}\{1}",V.local.sfile,V.Local.sfilename,V.Local.sfullpath)
+	F.Intrinsic.File.String2File(V.Local.sfullpath,V.Local.sExportDet)
+	Function.Intrinsic.Control.EndIf
+	f.ODBC.con!rst.Close
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("ExportAP_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4191_APARExport.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+Function.Intrinsic.Control.EndIf
+
+
+Program.Sub.ExportAP.End
+
+Program.Sub.ExportGL.Start
+F.Intrinsic.Control.SetErrorHandler("ExportGL_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+
+
+V.Local.ssql.Declare(String)
+V.Local.sGL.Declare(String)
+V.Local.sfile.Declare(String)
+V.Local.bexists.Declare(Boolean)
+V.Local.sdate.Declare(String)
+V.Local.sdate1.Declare(String)
+V.Local.sfilename.Declare(String)
+V.Local.sfullpath.Declare(String)
+V.Local.sExportGL.Declare(String)
+V.Local.sAmtGL.Declare(String)
+V.Local.sBatchno.Declare(String)
+
+V.Local.sGLAcctNo.Declare(String)
+V.Local.sDesc.Declare(String)
+V.Local.sFacility.Declare(String)
+V.Local.sDocDate.Declare(String)
+V.Local.sInvoice.Declare(String)
+
+
+'F.Intrinsic.Debug.InvokeDebugger
+'
+'F.Intrinsic.Debug.Stop
+
+'9/23/16 Dawn
+'F.Intrinsic.String.Build("Select GL_ACCOUNT,AMOUNT,POST_DATE From V_GL_DETAIL Where BATCH_NUM = '{0}'", V.Args.Batch, V.Local.ssql)
+f.Intrinsic.Control.If(v.Args.BatchType,=,"AP ACCRUALS")
+	F.Intrinsic.String.Build("Select Account,POST_DATE as P_Date,DEBIT_AMT as DR_Amount,CREDIT_AMT as CR_Amount,Reference as Invoice_NO,Reference From v_BI_COMB_JE_AUDIT Where Batch_Type <> '' and Batch_num = '{0}'", V.Args.Batch, V.Local.ssql)
+f.Intrinsic.Control.Else
+	F.Intrinsic.String.Build("Select Account,P_Date,DR_Amount,CR_Amount,Invoice_NO,Reference From v_GL_JRNL_ENTRY Where BATCH = '{0}'", V.Args.Batch, V.Local.ssql)
+f.Intrinsic.Control.endif
+F.ODBC.Connection!con.OpenRecordsetRO("rst", V.Local.ssql)	
+'build file	
+F.Intrinsic.Control.DoUntil(V.ODBC.con!rst.EOF,=,true)
+
+	f.Intrinsic.Control.If(V.ODBC.con!rst.FieldVal!DR_Amount,<>,0)
+		V.Local.sAmtGL.Set(V.ODBC.con!rst.FieldVal!DR_Amount)
+	f.Intrinsic.Control.elseIf(V.ODBC.con!rst.FieldVal!CR_Amount,<>,0)
+		f.Intrinsic.String.Build("-{0}",V.ODBC.con!rst.FieldVal!CR_Amount,V.Local.sAmtGL)
+	f.Intrinsic.Control.EndIf 
+
+	'AMT = 0 Exit
+	f.Intrinsic.Control.If(V.Local.sAmtGL.Long,<>,0)
+		Function.Intrinsic.String.Format(V.Local.sAmtGL,"####.00", V.Local.sAmtGL)
+	f.Intrinsic.Control.Else
+		f.Intrinsic.Control.GoTo("LBL1")
+	f.Intrinsic.Control.EndIf 
+
+'	Invoice_NO or reference blank exit							
+	f.Intrinsic.Control.if(v.ODBC.con!rst.FieldValTrim!Invoice_NO,"=","")
+		f.Intrinsic.Control.if(v.ODBC.con!rst.FieldValTrim!Reference,"<>","")
+			V.Local.sInvoice.Set(v.ODBC.con!rst.FieldValTrim!Reference)
+		f.Intrinsic.Control.Else
+			f.Intrinsic.Control.GoTo("LBL1")
+		f.Intrinsic.Control.endif
+	f.Intrinsic.Control.Else
+		V.Local.sInvoice.Set(v.ODBC.con!rst.FieldValTrim!Invoice_NO)
+	f.Intrinsic.Control.endif					
+
+
+
+'	'Remove 1st char
+'	f.Intrinsic.String.Mid(V.Args.Batch,2,V.Local.sBatchno)
+'	
+''	F.Intrinsic.String.Build("{0} 19,{1},19,{2},INVENTORY ADJUSTMENT,GL,{3},{4},{5}{6}", V.Local.sGL,V.ODBC.con!rst.FieldValtrim!Account,V.Local.sAmtGL,V.ODBC.con!rst.FieldValtrim!P_Date,V.Args.Batch,V.Caller.CompanyCode,v.Ambient.NewLine,V.Local.sGL)
+'	F.Intrinsic.String.Build("{0}19,{1},19,{2},INVENTORY ADJUSTMENT,0,{3},{4},SUMMIT{5}", V.Local.sGL,V.ODBC.con!rst.FieldValtrim!Account,V.Local.sAmtGL,V.ODBC.con!rst.FieldValtrim!P_Date,V.Local.sBatchno,v.Ambient.NewLine,V.Local.sGL)
+
+
+'	f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst.FieldValTrim!Account,V.Local.sGLAcctNo)
+
+	f.Intrinsic.Control.If(v.Args.BatchType,=,"AP ACCRUALS")
+		f.Intrinsic.String.Build("select upper(descr) as descr from GL_Master where GL_Account = '{0}'",v.ODBC.con!rst.FieldVal!Account,V.Local.sSQL)
+		F.ODBC.Connection!con.OpenRecordsetRO("rstAct",V.local.ssql)
+		F.Intrinsic.Control.if(V.ODBC.con!rstAct.EOF,=,False)
+			f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rstAct.FieldValTrim!descr,V.Local.sDesc)
+		f.Intrinsic.Control.EndIf 
+		F.ODBC.con!rstAct.Close
+	f.Intrinsic.Control.Else
+		f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,"INVENTORY ADJUSTMENT",V.Local.sDesc)
+	f.Intrinsic.Control.EndIf 			
+
+	f.Intrinsic.String.Build("{0}{1}0000{0}",v.Ambient.DblQuote,v.ODBC.con!rst.FieldValTrim!Account,V.Local.sGLAcctNo)
+	f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,V.Local.sAmtGL,V.Local.sAmtGL)
+'	f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,"INVENTORY ADJUSTMENT",V.Local.sDesc)
+	f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,"SUMMIT",V.Local.sFacility)
+	Function.Intrinsic.String.Format(v.Ambient.Now ,"MM/DD/YYYY Hh:Nn:Ss",V.Local.sDocDate)
+	f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,V.Local.sDocDate,V.Local.sDocDate)
+
+
+	'Remove 1st char
+	f.Intrinsic.String.Mid(V.Args.Batch,2,V.Local.sBatchno)
+
+'	F.Intrinsic.String.Build("{0} 19,{1},19,{2},INVENTORY ADJUSTMENT,GL,{3},{4},{5}{6}", V.Local.sGL,V.ODBC.con!rst.FieldValtrim!Account,V.Local.sAmtGL,V.ODBC.con!rst.FieldValtrim!P_Date,V.Args.Batch,V.Caller.CompanyCode,v.Ambient.NewLine,V.Local.sGL)
+'	F.Intrinsic.String.Build("{0}19,{1},19,{2},INVENTORY ADJUSTMENT,0,{3},{4},SUMMIT{5}", V.Local.sGL,V.ODBC.con!rst.FieldValtrim!Account,V.Local.sAmtGL,V.ODBC.con!rst.FieldValtrim!T_Date,V.Local.sBatchno,v.Ambient.NewLine,V.Local.sGL)
+
+'	F.Intrinsic.String.Build("{0}19,{1},19,{2},INVENTORY ADJUSTMENT,0,{3},{4},{5}{6}", V.Local.sGL,V.Local.sGLAcctNo,V.Local.sAmtGL,V.Local.sDocDate,V.Local.sBatchno,V.Local.sFacility,v.Ambient.NewLine,V.Local.sGL)
+
+	F.Intrinsic.String.Build("{0}{1},{2},12,{3},{4},0,{5},{6},{7}{8}", V.Local.sGL,V.Local.sInvoice,V.Local.sGLAcctNo,V.Local.sAmtGL,V.Local.sDesc,V.Local.sDocDate,V.Local.sBatchno,V.Local.sFacility,v.Ambient.NewLine,V.Local.sGL)
+
+F.Intrinsic.Control.Label("LBL1")
+
+	F.ODBC.con!rst.MoveNext 
+F.Intrinsic.Control.loop
+F.ODBC.con!rst.Close
+
+'build the filepath
+F.Intrinsic.String.build("{0}{1}",V.Caller.FilesDir,"\Great Plains\GL",V.Local.sfile)
+'see if the folder exists
+F.Intrinsic.File.Exists(V.Local.sfile,V.Local.bexists)
+'if the file doesn't exists create it
+F.Intrinsic.Control.If(V.Local.bexists,=,False)
+	F.Intrinsic.File.CreateDir(V.Local.sfile)
+F.Intrinsic.Control.EndIf
+
+'set the date and format it
+Function.Intrinsic.String.Format (V.Ambient.Date,"YYYYDDMM",V.Local.sdate)
+Function.Intrinsic.String.Format (V.Ambient.Time,"HHNNSS",V.Local.sdate1)
+F.Intrinsic.String.Build("{0} {1}",V.Local.sdate,V.Local.sdate1,V.Local.sdate)	
+
+'build the filename
+F.Intrinsic.String.Build("{0}_GL.csv",V.Local.sDate,V.Local.sfilename)
+'build the full path
+F.Intrinsic.String.Build("{0}\{1}",V.local.sfile,V.Local.sfilename,V.Local.sfullpath)
+F.Intrinsic.File.String2File(V.Local.sfullpath,V.Local.sGL)	
+
+
+
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("ExportGL_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4191_APARExport.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	Function.Intrinsic.Control.End
+
+Function.Intrinsic.Control.EndIf
+
+
+Program.Sub.ExportGL.End
+
+Program.Sub.ExportInventory.Start
+F.Intrinsic.Control.SetErrorHandler("ExportInventory_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+
+
+V.Local.ssql.Declare(String)
+V.Local.sGL.Declare(String)
+V.Local.sfile.Declare(String)
+V.Local.bexists.Declare(Boolean)
+V.Local.sdate.Declare(String)
+V.Local.sdate1.Declare(String)
+V.Local.sfilename.Declare(String)
+V.Local.sfullpath.Declare(String)
+V.Local.sExportGL.Declare(String)
+V.Local.sAmtGL.Declare(String)
+V.Local.sBatchno.Declare(String)
+V.Local.sGLAcctNo.Declare(String)
+V.Local.sDesc.Declare(String)
+V.Local.sFacility.Declare(String)
+V.Local.sDocDate.Declare(String)
+V.Local.sInvoice.Declare(String)
+
+'F.Intrinsic.String.Build("Select GL_ACCOUNT,AMOUNT,POST_DATE From V_GL_DETAIL Where BATCH_NUM = '{0}'", V.Args.Batch, V.Local.ssql)
+
+F.Intrinsic.String.Build("Select Account,T_Date,DR_Amount,CR_Amount,Trans_code,Refer_1 From v_GL_Inventory_Dtls  Where batch = '{0}'", V.Args.Batch, V.Local.ssql)
+F.ODBC.Connection!con.OpenRecordsetRO("rst", V.Local.ssql)	
+'build file	
+F.Intrinsic.Control.DoUntil(V.ODBC.con!rst.EOF,=,true)
+
+	f.Intrinsic.Control.If(V.ODBC.con!rst.FieldVal!DR_Amount,<>,0)
+		V.Local.sAmtGL.Set(V.ODBC.con!rst.FieldVal!DR_Amount)
+	f.Intrinsic.Control.elseIf(V.ODBC.con!rst.FieldVal!CR_Amount,<>,0)
+		f.Intrinsic.String.Build("-{0}",V.ODBC.con!rst.FieldVal!CR_Amount,V.Local.sAmtGL)
+	f.Intrinsic.Control.EndIf 
+
+	f.Intrinsic.Control.If(V.Local.sAmtGL.Long,=,0)
+		f.Intrinsic.Control.GoTo("LBL1")
+	f.Intrinsic.Control.EndIf 
+
+'	f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst.FieldValTrim!Account,V.Local.sGLAcctNo)
+	f.Intrinsic.String.Build("{0}{1}0000{0}",v.Ambient.DblQuote,v.ODBC.con!rst.FieldValTrim!Account,V.Local.sGLAcctNo)
+
+	f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,V.Local.sAmtGL,V.Local.sAmtGL)
+	f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,"INVENTORY ADJUSTMENT",V.Local.sDesc)
+	f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,"SUMMIT",V.Local.sFacility)
+	Function.Intrinsic.String.Format(v.Ambient.Now ,"MM/DD/YYYY Hh:Nn:Ss",V.Local.sDocDate)
+	f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,V.Local.sDocDate,V.Local.sDocDate)
+
+'	f.Intrinsic.String.Split(v.ODBC.con!rst.FieldValTrim!Refer_1,"INVC #",V.Local.sInvoice)
+'	f.Intrinsic.Control.If(V.Local.sInvoice.UBound,>,0)
+'		V.Local.sInvoice.Set(V.Local.sInvoice(1).Trim)
+'	f.Intrinsic.Control.else
+'		V.Local.sInvoice.Set(v.ODBC.con!rst.FieldValTrim!Refer_1)
+'	f.Intrinsic.Control.EndIf 
+
+
+	'Remove 1st char
+	f.Intrinsic.String.Mid(V.Args.Batch,2,V.Local.sBatchno)
+
+	f.Intrinsic.String.StripCharacters(V.Local.sDocDate,V.Local.sInvoice)
+	f.Intrinsic.String.Build("{0}{1}",V.Local.sInvoice,V.Local.sBatchno,V.Local.sInvoice)
+
+'	F.Intrinsic.String.Build("{0} 19,{1},19,{2},INVENTORY ADJUSTMENT,GL,{3},{4},{5}{6}", V.Local.sGL,V.ODBC.con!rst.FieldValtrim!Account,V.Local.sAmtGL,V.ODBC.con!rst.FieldValtrim!P_Date,V.Args.Batch,V.Caller.CompanyCode,v.Ambient.NewLine,V.Local.sGL)
+'	F.Intrinsic.String.Build("{0}19,{1},19,{2},INVENTORY ADJUSTMENT,0,{3},{4},SUMMIT{5}", V.Local.sGL,V.ODBC.con!rst.FieldValtrim!Account,V.Local.sAmtGL,V.ODBC.con!rst.FieldValtrim!T_Date,V.Local.sBatchno,v.Ambient.NewLine,V.Local.sGL)
+
+'	F.Intrinsic.String.Build("{0}19,{1},19,{2},INVENTORY ADJUSTMENT,0,{3},{4},{5}{6}", V.Local.sGL,V.Local.sGLAcctNo,V.Local.sAmtGL,V.Local.sDocDate,V.Local.sBatchno,V.Local.sFacility,v.Ambient.NewLine,V.Local.sGL)
+
+	F.Intrinsic.String.Build("{0}{1},{2},12,{3},{4},0,{5},{6},{7}{8}", V.Local.sGL,V.Local.sInvoice,V.Local.sGLAcctNo,V.Local.sAmtGL,V.Local.sDesc,V.Local.sDocDate,V.Local.sBatchno,V.Local.sFacility,v.Ambient.NewLine,V.Local.sGL)
+
+F.Intrinsic.Control.Label("LBL1")
+
+	F.ODBC.con!rst.MoveNext 
+F.Intrinsic.Control.loop
+F.ODBC.con!rst.Close
+
+'build the filepath
+F.Intrinsic.String.build("{0}{1}",V.Caller.FilesDir,"\Great Plains\GL",V.Local.sfile)
+'see if the folder exists
+F.Intrinsic.File.Exists(V.Local.sfile,V.Local.bexists)
+'if the file doesn't exists create it
+F.Intrinsic.Control.If(V.Local.bexists,=,False)
+	F.Intrinsic.File.CreateDir(V.Local.sfile)
+F.Intrinsic.Control.EndIf
+
+'set the date and format it
+Function.Intrinsic.String.Format (V.Ambient.Date,"YYYYDDMM",V.Local.sdate)
+Function.Intrinsic.String.Format (V.Ambient.Time,"HHNNSS",V.Local.sdate1)
+F.Intrinsic.String.Build("{0} {1}",V.Local.sdate,V.Local.sdate1,V.Local.sdate)	
+
+'build the filename
+F.Intrinsic.String.Build("{0}_GL.csv",V.Local.sDate,V.Local.sfilename)
+'build the full path
+F.Intrinsic.String.Build("{0}\{1}",V.local.sfile,V.Local.sfilename,V.Local.sfullpath)
+F.Intrinsic.File.String2File(V.Local.sfullpath,V.Local.sGL)	
+
+
+
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("ExportInventory_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4191_APARExport.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+Function.Intrinsic.Control.EndIf
+
+
+Program.Sub.ExportInventory.End
+
+Program.Sub.AR_Export2.Start
+F.Intrinsic.Control.SetErrorHandler("AR_Export2_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+V.Local.sSQL.Declare(String)
+V.Local.sExportHdr.Declare(String)
+V.Local.sExportDet.Declare(String)
+V.Local.sBatchno.Declare(String)
+V.Local.bexists.Declare(Boolean)
+V.Local.sdate.Declare(String)
+V.Local.sdate1.Declare(String)
+V.Local.sfilename.Declare(String)
+V.Local.sfile.Declare(String)
+V.Local.sfullpath.Declare(String)
+V.Local.sDocDate.Declare(String)
+V.Local.sDocDate1.Declare(String)
+V.Local.sInvoiceNo.Declare(String)
+
+V.Local.sCust.Declare(String)
+V.Local.sDocNo.Declare(String)
+V.Local.sPurAmt.Declare(String)
+V.Local.sInvNo.Declare(String)
+V.Local.sFrtAMT.Declare(String)
+V.Local.sCurrAMT.Declare(String)
+V.Local.sExchgCurr.Declare(String)
+V.Local.sExchgRate.Declare(String)
+V.Local.sGLAcctNo.Declare(String)
+V.Local.sCost.Declare(String)
+V.Local.sMiscAMT.Declare(String)
+V.Local.sPaymentT.Declare(String)
+V.Local.sSalesRep.Declare(String)
+V.Local.sFacility.Declare(String)
+V.Local.sPayType.Declare(String)
+V.Local.sDocType.Declare(String)
+V.Local.sDocText.Declare(String)
+V.Local.sTranType.Declare(String)
+v.local.bret.Declare(Boolean)
+V.Local.dInvcDate.Declare(Date)
+
+V.Local.sInvAmt.Declare(String)
+V.Local.sFrt.Declare(String)
+
+'To handle multiple Invoice header
+v.local.bEnt.Declare(Boolean)
+V.Local.sInvoiceNo_New.Declare(string)
+V.Local.sInvoiceNo_2.Declare(string)
+
+
+'
+'F.Intrinsic.Debug.InvokeDebugger
+'
+'F.Intrinsic.Debug.Stop
+
+
+'	V.Local.sBatchno.Set("S0075")
+	V.Local.sBatchno.Set(v.Args.Batch)
+
+
+	V.Local.sSQL.Set("select CUST as customer,invoice_no as Invoice,INVC_Date as Date_Invoice,Tran_Type,Terms_Code,SALSM as SALESMAN,GL_NUMBER AS GL_ACCOUNT,Amount_Cmpny AS AMOUNT,COST_CMPNY AS COST,Exch_OE_Curr AS EXCH_CURR,AMOUNT_OE AS EXCH_AMT,REFN AS REFERENCE from v_Gl_AR_detail ")
+	f.Intrinsic.String.Build(" {0} where Batch = '{1}' order by invoice_no,line",V.Local.sSQL,v.Args.Batch,V.Local.sSQL)
+
+	f.Intrinsic.Control.If(v.Args.BatchType,=,"AR CREDIT MEMO")
+		V.Local.sDocType.Set("2")
+	f.Intrinsic.Control.Else
+		V.Local.sDocType.Set("1")
+	f.Intrinsic.Control.EndIf 
+
+	F.ODBC.Connection!con.OpenRecordsetRO("rst",V.local.ssql)
+	F.Intrinsic.Control.If(V.ODBC.con!rst.EOF,=,False)
+
+				'Remove 1st char
+		f.Intrinsic.String.Mid(v.Args.Batch,2,V.Local.sBatchno)
+		f.Intrinsic.Control.DoUntil(v.ODBC.con!rst.EOF,=,true)
+
+				'create hdr file only invoice is different, first loop enter assign invoiceno
+				f.Intrinsic.Control.If(v.local.bEnt,=,False)
+					v.local.bEnt.Set(true)
+					V.Local.sInvoiceNo_New.Set(v.ODBC.con!rst.FieldValtrim!invoice)
+				f.Intrinsic.Control.endif
+
+				f.Intrinsic.Control.If(V.Local.sInvoiceNo_New,<>,v.ODBC.con!rst.FieldValtrim!invoice)
+					'only one line
+					f.Intrinsic.String.Build("{0}{1},{2},{3},{4},{5},",v.Local.sExportHdr,V.Local.sCust,V.Local.sInvAmt,V.Local.sBatchno,V.Local.sDocType,V.Local.sInvoiceNo_2,V.Local.sExportHdr)
+					'9/21/16 Dawn: changed sDate to sDocDate removed zeros and left empty
+					f.Intrinsic.String.Build("{0}{1},{2},{3},{4},{5},{5},{5},{5},",V.Local.sExportHdr,V.Local.sInvoiceNo_2,V.Local.sDocDate1,V.Local.sCost,V.Local.sFrtAMT,V.Local.sMiscAMT,V.Local.sExportHdr)
+
+					f.Intrinsic.String.Build("{0}{1},{2},{3},{4},{5},",V.Local.sExportHdr,V.Local.sPaymentT,V.Local.sdate1,V.Local.sInvoiceNo_2,V.Local.sPayType,V.Local.sFacility,V.Local.sExportHdr)
+					f.Intrinsic.String.Build("{0}{1},{2},{3}{4}",V.Local.sExportHdr,V.Local.sExchgCurr,V.Local.sCurrAMT,V.Local.sExchgRate,v.Ambient.NewLine ,v.Local.sExportHdr)
+					V.Local.sInvoiceNo_New.set(v.ODBC.con!rst.FieldValtrim!invoice)
+				f.Intrinsic.Control.EndIf 
+				
+				F.Intrinsic.Date.ConvertDString(v.ODBC.con!rst.FieldVal!Date_Invoice,"YYYYMMDD",V.Local.dInvcDate)
+				Function.Intrinsic.String.Format(V.Local.dInvcDate,"MM/DD/YYYY",V.Local.sdate)
+				
+
+				'process invoices are different
+				f.Intrinsic.Control.If(V.Local.sInvoiceNo,<>,v.ODBC.con!rst.FieldValtrim!invoice)
+					V.Local.sInvoiceNo.Set(v.ODBC.con!rst.FieldValtrim!invoice)
+					Function.Intrinsic.String.Format(V.Local.dInvcDate ,"MM/DD/YYYY",V.Local.sDocDate)
+					f.Intrinsic.String.Build("select Terms_Message from v_ar_terms where Terms_code = '{0}'",v.ODBC.con!rst.FieldValtrim!Terms_Code,V.Local.sSQL)
+					F.ODBC.Connection!con.OpenRecordsetRO("rst2",V.local.ssql)
+					F.Intrinsic.Control.If(V.ODBC.con!rst2.EOF,=,False)
+	'					V.Local.sPaymentT.Set(v.ODBC.con!rst2.FieldVal!Terms_message)
+						f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst2.FieldValtrim!Terms_message,V.Local.sPaymentT)
+					f.Intrinsic.Control.EndIf 
+					f.ODBC.con!rst2.Close
+
+					f.Intrinsic.String.Build("select External_ID from v_CUST_FORM_INFO where customer = '{0}'",v.ODBC.con!rst.FieldValtrim!customer,V.Local.sSQL)
+					F.ODBC.Connection!con.OpenRecordsetRO("rst3",V.local.ssql)
+					F.Intrinsic.Control.If(V.ODBC.con!rst3.EOF,=,False)
+						f.Intrinsic.String.Build("{0}CSA{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst3.FieldValtrim!External_id,V.Local.sCust)
+					f.Intrinsic.Control.EndIf 
+					f.ODBC.con!rst3.Close
+				f.Intrinsic.Control.EndIf
+
+
+				'get only -ve values
+'				f.Intrinsic.Control.If(v.ODBC.con!rst.FieldVal!Amount,"<",0)
+
+					f.Intrinsic.Control.If(v.Args.BatchType,=,"AR CREDIT MEMO")
+						f.Intrinsic.String.Split(v.ODBC.con!rst.FieldValTrim!reference,"CM #",V.Local.sInvoiceNo_2)
+						f.Intrinsic.Control.If(V.Local.sInvoiceNo_2.UBound,>,0)
+							V.Local.sInvoiceNo_2.Set(V.Local.sInvoiceNo_2(1))
+						f.Intrinsic.Control.else
+							V.Local.sInvoiceNo_2.Set(v.ODBC.con!rst.FieldValTrim!reference)
+						f.Intrinsic.Control.EndIf 
+						f.Intrinsic.String.Build("{0}CM",V.Local.sInvoiceNo_2.trim,V.Local.sInvoiceNo_2)
+					f.Intrinsic.Control.Else
+						V.Local.sInvoiceNo_2.Set(v.ODBC.con!rst.FieldValTrim!Invoice)
+					f.Intrinsic.Control.EndIf 
+
+					f.Intrinsic.Control.If(v.ODBC.con!rst.FieldVal!Amount,<>,0)
+						Function.Intrinsic.String.Format(v.ODBC.con!rst.FieldVal!Amount,"####.00", V.Local.sPurAmt)
+					f.Intrinsic.Control.Else
+						V.Local.sPurAmt.Set(v.ODBC.con!rst.FieldVal!Amount)
+					f.Intrinsic.Control.EndIf
+					'Hdr
+	'				f.Intrinsic.String.Build("{0}CSA{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst.FieldValtrim!customer,V.Local.sCust)
+					f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,V.Local.sPurAmt,V.Local.sPurAmt)
+					f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,V.Local.sInvoiceNo_2,V.Local.sInvoiceNo_2)
+	'				f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst.FieldValTrim!Frt_Amt_CO_Curr,V.Local.sFrtAMT)
+					f.Intrinsic.String.Build("{0}0{0}",v.Ambient.DblQuote,V.Local.sMiscAMT)
+					f.Intrinsic.String.Build("{0}1{0}",v.Ambient.DblQuote,V.Local.sExchgRate)
+'					f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst.FieldVal!Exch_Amt,V.Local.sCurrAMT)
+					f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst.FieldValTrim!Exch_Curr,V.Local.sExchgCurr)
+					f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,V.Local.sdate,V.Local.sdate1)
+					F.Intrinsic.Debug.Stop
+					f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,V.Local.sDocDate,V.Local.sDocDate1)
+'					f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst.FieldVal!Cost,V.Local.sCost)
+					f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,"SUMMIT",V.Local.sFacility)
+					f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,"CASH",V.Local.sPayType)
+	'				f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,"Invoice Number Text",V.Local.sDocText)
+					f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst.FieldValtrim!Invoice,V.Local.sDocText)
+
+					f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst.FieldValTrim!salesman,V.Local.sSalesRep)
+
+					v.local.bret.set(False)
+					f.Intrinsic.String.Build("select upper(descr) as descr from GL_Master where GL_Account = '{0}'",v.ODBC.con!rst.FieldVal!GL_Account,V.Local.sSQL)
+					F.ODBC.Connection!con.OpenRecordsetRO("rstFRT",V.local.ssql)
+					F.Intrinsic.Control.If(V.ODBC.con!rstFRT.EOF,=,False)
+						Function.Intrinsic.String.IsInString(v.ODBC.con!rstFRT.FieldValTrim!descr,"FREIGHT",True,v.local.bret)
+					f.Intrinsic.Control.EndIf 
+					f.ODBC.con!rstFRT.Close
+
+
+					'if Freight Account
+					f.Intrinsic.Control.If(v.local.bret,=,True)
+						f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst.FieldVal!Amount,V.Local.sFrtAMT)
+					f.Intrinsic.Control.Else
+						f.Intrinsic.String.Build("{0}0{0}",v.Ambient.DblQuote,V.Local.sFrtAMT)
+					f.Intrinsic.Control.EndIf 
+
+
+					'get only -ve values
+				f.Intrinsic.Control.If(v.ODBC.con!rst.FieldVal!Amount,"<",0)
+					f.Intrinsic.Control.If(v.local.bret,=,True)
+						V.Local.sFRT.Set(V.Local.sFrtAMT)
+					f.Intrinsic.Control.Else
+						V.Local.sInvAmt.Set(V.Local.sPurAmt)
+'						f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst.FieldVal!Cost,V.Local.sCost)
+						f.Intrinsic.String.Build("{0}0{0}",v.Ambient.DblQuote,V.Local.sCost)
+
+
+						f.Intrinsic.Control.If(v.ODBC.con!rst.FieldVal!Exch_Amt,<>,0)
+							Function.Intrinsic.String.Format(v.ODBC.con!rst.FieldVal!Exch_Amt,"####.00", V.Local.sCurrAMT)
+						f.Intrinsic.Control.Else
+							V.Local.sCurrAMT.Set(v.ODBC.con!rst.FieldVal!Exch_Amt)
+						f.Intrinsic.Control.EndIf 
+
+						f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,V.Local.sCurrAMT,V.Local.sCurrAMT)
+					f.Intrinsic.Control.EndIf 
+				f.Intrinsic.Control.EndIf 
+
+'				f.Intrinsic.String.Build("select upper(descr) as descr from GL_Master where GL_Account = '{0}'",v.ODBC.con!rst.FieldVal!GL_Account,V.Local.sSQL)
+'				F.ODBC.Connection!con.OpenRecordsetRO("rstFRT",V.local.ssql)
+'				F.Intrinsic.Control.If(V.ODBC.con!rstFRT.EOF,=,False)
+'					Function.Intrinsic.String.IsInString(v.ODBC.con!rstFRT.FieldValTrim!descr,"FREIGHT",True,v.local.bret)
+'					f.Intrinsic.Control.If(v.local.bret,=,True)
+'						V.Local.sTranType.Set("11")
+'					f.Intrinsic.Control.Else
+'						f.Intrinsic.Control.If(v.ODBC.con!rst.FieldVal!Amount,>=,0)
+'							V.Local.sTranType.Set("5")
+'						f.Intrinsic.Control.Else
+'							V.Local.sTranType.Set("7")
+'						f.Intrinsic.Control.EndIf
+'					f.Intrinsic.Control.EndIf
+'				f.Intrinsic.Control.Else
+'					f.Intrinsic.Control.If(v.ODBC.con!rst.FieldVal!Amount,>=,0)
+'						V.Local.sTranType.Set("5")
+'					f.Intrinsic.Control.Else
+'						V.Local.sTranType.Set("7")
+'					f.Intrinsic.Control.EndIf
+'				f.Intrinsic.Control.EndIf 
+'				f.ODBC.con!rstFRT.Close
+
+				f.Intrinsic.String.Build("select upper(descr) as descr from GL_Master where GL_Account = '{0}'",v.ODBC.con!rst.FieldVal!GL_Account,V.Local.sSQL)
+				F.ODBC.Connection!con.OpenRecordsetRO("rstFRT",V.local.ssql)
+				F.Intrinsic.Control.If(V.ODBC.con!rstFRT.EOF,=,False)
+				Function.Intrinsic.String.IsInString(v.ODBC.con!rstFRT.FieldValTrim!descr,"FREIGHT",True,v.local.bret)
+					f.Intrinsic.Control.If(v.local.bret,=,True)
+						V.Local.sTranType.Set("11")
+					f.Intrinsic.Control.Else
+						f.Intrinsic.Control.If(v.Args.BatchType,=,"AR CREDIT MEMO")
+							f.Intrinsic.Control.If(v.ODBC.con!rst.FieldVal!Amount,>=,0)
+								V.Local.sTranType.Set("7")
+							f.Intrinsic.Control.Else
+								V.Local.sTranType.Set("5")
+							f.Intrinsic.Control.EndIf
+						f.Intrinsic.Control.Else
+							f.Intrinsic.Control.If(v.ODBC.con!rst.FieldVal!Amount,>=,0)
+								V.Local.sTranType.Set("5")
+							f.Intrinsic.Control.Else
+								V.Local.sTranType.Set("7")
+							f.Intrinsic.Control.EndIf
+						f.Intrinsic.Control.EndIf
+					f.Intrinsic.Control.EndIf
+				f.Intrinsic.Control.Else
+					f.Intrinsic.Control.If(v.Args.BatchType,=,"AR CREDIT MEMO")
+						f.Intrinsic.Control.If(v.ODBC.con!rst.FieldVal!Amount,>=,0)
+							V.Local.sTranType.Set("7")
+						f.Intrinsic.Control.Else
+							V.Local.sTranType.Set("5")
+						f.Intrinsic.Control.EndIf
+					f.Intrinsic.Control.Else
+						f.Intrinsic.Control.If(v.ODBC.con!rst.FieldVal!Amount,>=,0)
+							V.Local.sTranType.Set("5")
+						f.Intrinsic.Control.Else
+							V.Local.sTranType.Set("7")
+						f.Intrinsic.Control.EndIf
+					f.Intrinsic.Control.EndIf
+				f.Intrinsic.Control.EndIf 
+				f.ODBC.con!rstFRT.Close
+
+				f.Intrinsic.String.Build("{0}{1}0000{0}",v.Ambient.DblQuote,v.ODBC.con!rst.FieldValTrim!GL_Account,V.Local.sGLAcctNo)
+'				f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst.FieldVal!Amount,V.Local.sPurAmt)
+'				f.Intrinsic.String.Build("{0}{1}{0}",v.Ambient.DblQuote,v.ODBC.con!rst.FieldValtrim!invoice_no,V.Local.sInvNo)
+
+				'Detail file
+				'9/22/16 Dawn: Removed extra comma added trim and removed , from last line in file
+				f.Intrinsic.String.Build("{0}{1},{2},{3},{4},{5},{6},{7}{8}",V.Local.sExportDet,V.Local.sGLAcctNo,V.Local.sTranType,V.Local.sPurAmt,V.Local.sInvoiceNo_2,V.Local.sInvoiceNo_2,V.Local.sBatchno,V.Local.sFacility,v.Ambient.NewLine,V.Local.sExportDet)
+
+				f.ODBC.con!rst.MoveNext 
+			f.Intrinsic.Control.loop
+'		f.Intrinsic.Control.EndIf 
+
+		'only one line
+		f.Intrinsic.String.Build("{0}{1},{2},{3},{4},{5},",v.Local.sExportHdr,V.Local.sCust,V.Local.sInvAmt,V.Local.sBatchno,V.Local.sDocType,V.Local.sInvoiceNo_2,V.Local.sExportHdr)
+		'9/21/16 Dawn: changed sDate to sDocDate removed zeros and left empty
+		f.Intrinsic.String.Build("{0}{1},{2},{3},{4},{5},{5},{5},{5},",V.Local.sExportHdr,V.Local.sInvoiceNo_2,V.Local.sDocDate1,V.Local.sCost,V.Local.sFrtAMT,V.Local.sMiscAMT,V.Local.sExportHdr)
+
+		f.Intrinsic.String.Build("{0}{1},{2},{3},{4},{5},",V.Local.sExportHdr,V.Local.sPaymentT,V.Local.sdate1,V.Local.sInvoiceNo_2,V.Local.sPayType,V.Local.sFacility,V.Local.sExportHdr)
+
+'				f.Intrinsic.String.Build("{0}{1},{2},{3},{4}{5}",V.Local.sExportHdr,V.Local.sExchgCurr,V.Local.sCurrAMT,V.Local.sExchgRate,V.Local.sSalesRep,v.Ambient.NewLine ,v.Local.sExportHdr)
+		f.Intrinsic.String.Build("{0}{1},{2},{3}{4}",V.Local.sExportHdr,V.Local.sExchgCurr,V.Local.sCurrAMT,V.Local.sExchgRate,v.Ambient.NewLine ,v.Local.sExportHdr)
+
+		'build the filepath
+		F.Intrinsic.String.build("{0}{1}",V.Caller.FilesDir,"\Great Plains\AR",V.Local.sfile)
+		'see if the folder exists
+		F.Intrinsic.File.Exists(V.Local.sfile,V.Local.bexists)
+		'if the file doesn't exists create it
+		F.Intrinsic.Control.If(V.Local.bexists,=,False)
+			F.Intrinsic.File.CreateDir(V.Local.sfile)
+		F.Intrinsic.Control.EndIf
+		'set the date and format it
+		Function.Intrinsic.String.Format (V.Ambient.Date ,"YYYYDDMM",V.Local.sdate)
+		Function.Intrinsic.String.Format (V.Ambient.Time ,"HHNNSS",V.Local.sdate1)
+		f.Intrinsic.String.Build("{0} {1}",V.Local.sdate,V.Local.sdate1,V.Local.sdate)
+		'build the filename
+		F.Intrinsic.String.Build("{0}_AR.csv",V.Local.sDate,V.Local.sfilename)
+		'build the full path
+		F.Intrinsic.String.Build("{0}\{1}",V.local.sfile,V.Local.sfilename,V.Local.sfullpath)
+		F.Intrinsic.File.String2File(V.Local.sfullpath,V.Local.sExportHdr)
+
+		F.Intrinsic.String.Build("{0}_ARDETAIL.csv",V.Local.sDate,V.Local.sfilename)
+		F.Intrinsic.String.Build("{0}\{1}",V.local.sfile,V.Local.sfilename,V.Local.sfullpath)
+		F.Intrinsic.File.String2File(V.Local.sfullpath,V.Local.sExportDet)
+	Function.Intrinsic.Control.EndIf
+	f.ODBC.con!rst.Close
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("AR_Export2_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4191_APARExport.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+Function.Intrinsic.Control.EndIf
+
+
+Program.Sub.AR_Export2.End
+
+Program.Sub.Comments.Start
+${$0$}$GCG_4191_APARExport.g2u$}$RAN$}$9/15/2016 2:51:43 PM$}$False
+${$3$}$0$}$$}$0$}$-1$}$$}$12:00:00 AM$}$Modification of ARC Project 1507 original program GCG_6963-2_Multi_MRP.gas
+This adds in the ability to save the Summary for later use.
+Program.Sub.Comments.End
